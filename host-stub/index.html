@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <title>Host Stub (fake portal)</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 16px;
+            background: #151826;
+            color: #e6e8f2;
+            font: 14px system-ui, sans-serif;
+        }
+
+        iframe {
+            width: 100%;
+            max-width: 800px;
+            aspect-ratio: 16/9;
+            border: 1px solid #2f3555;
+            border-radius: 8px;
+            background: #000;
+        }
+
+        input {
+            width: 460px;
+            background: #1b1f33;
+            color: inherit;
+            border: 1px solid #2f3555;
+            border-radius: 6px;
+            padding: 6px;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Host Stub</h1>
+    <p>Sanctum token (leave empty to play as guest): <input id="token"></p>
+    <iframe id="game" src="http://127.0.0.1:5500/index.html"
+        sandbox="allow-scripts allow-same-origin allow-pointer-lock"></iframe>
+
+    <script>
+        const GAME_ORIGIN = 'http://localhost:5500';
+        const API = 'http://127.0.0.1:8000/api';
+        const SLUG = 'test-harness';
+        const iframe = document.getElementById('game');
+        const token = () => document.getElementById('token').value.trim();
+
+        const STATUS_TO_CODE = { 401: 'UNAUTHENTICATED', 403: 'FORBIDDEN', 409: 'CONFLICT', 422: 'VALIDATION_FAILED', 429: 'RATE_LIMITED' };
+
+        function reply(requestId, type, payload) {
+            iframe.contentWindow.postMessage({ source: 'GAME_PORTAL_HOST', version: 1, type, requestId, payload }, GAME_ORIGIN);
+        }
+
+        async function api(method, path, body) {
+            if (!token()) throw { code: 'UNAUTHENTICATED', message: 'Log in to use this feature.', status: 401 };
+            const res = await fetch(`${API}${path}`, {
+                method,
+                headers: { Accept: 'application/json', 'Content-Type': 'application/json', Authorization: `Bearer ${token()}` },
+                body: body ? JSON.stringify(body) : undefined,
+            });
+            const json = await res.json().catch(() => ({}));
+            if (!res.ok) throw { code: STATUS_TO_CODE[res.status] ?? 'NETWORK_ERROR', message: json.message ?? res.statusText, status: res.status };
+            return json;
+        }
+
+        const handlers = {
+            READY: null, // fire-and-forget, no reply
+            INIT: async () => {
+                const game = { slug: SLUG, version: 1 };
+                if (!token()) return { user: null, game, isGuest: true, isSandbox: false };
+                const u = await api('GET', '/user');
+                return { user: { id: u.id, username: u.username, avatarUrl: u.avatar_path }, game, isGuest: false, isSandbox: false };
+            },
+            SUBMIT_SCORE: async (p) => {
+                const r = await api('POST', `/games/${SLUG}/scores`, p);
+                return { score: r.score, personalBest: r.personal_best, rank: r.rank, isNewBest: r.is_new_best };
+            },
+            SAVE_STATE: async (p) => {
+                const r = await api('POST', `/games/${SLUG}/saves`, p);
+                return { slot: r.slot, revision: r.revision, savedAt: r.updated_at };
+            },
+            LOAD_STATE: async (p) => {
+                const r = await api('GET', `/games/${SLUG}/saves/${p?.slot ?? 0}`);
+                return { slot: r.slot, data: r.data, revision: r.revision, savedAt: r.updated_at };
+            },
+        };
+
+        window.addEventListener('message', async (event) => {
+            if (event.origin !== GAME_ORIGIN || event.source !== iframe.contentWindow) return;
+            const msg = event.data;
+            if (msg?.source !== 'GAME_PORTAL_SDK' || msg.version !== 1 || !(msg.type in handlers)) return;
+            console.log('[Host] ⇐', msg);
+
+            const handler = handlers[msg.type];
+            if (!handler) return;
+            try { reply(msg.requestId, 'RESPONSE', await handler(msg.payload)); }
+            catch (e) { reply(msg.requestId, 'ERROR', { code: e.code ?? 'NETWORK_ERROR', message: e.message ?? String(e), status: e.status }); }
+        });
+    </script>
+</body>
+
+</html>

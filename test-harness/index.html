@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Platform Test Harness</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 16px;
+            font: 14px/1.4 system-ui, sans-serif;
+            background: #0f1220;
+            color: #e6e8f2;
+        }
+
+        .row {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 10px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        button {
+            background: #6c5ce7;
+            color: #fff;
+            border: 0;
+            border-radius: 6px;
+            padding: 8px 12px;
+            cursor: pointer;
+        }
+
+        input,
+        textarea {
+            background: #1b1f33;
+            color: inherit;
+            border: 1px solid #2f3555;
+            border-radius: 6px;
+            padding: 6px;
+        }
+
+        #badge {
+            padding: 4px 10px;
+            border-radius: 999px;
+            background: #1b1f33;
+        }
+
+        #log {
+            background: #05060c;
+            height: 200px;
+            overflow: auto;
+            padding: 8px;
+            font: 12px ui-monospace, monospace;
+            white-space: pre-wrap;
+        }
+
+        .ok {
+            color: #55efc4;
+        }
+
+        .err {
+            color: #ff7675;
+        }
+
+        .msg {
+            color: #74b9ff;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="row"><strong>Test Harness</strong><span id="badge">Not connected</span><span id="mode"></span></div>
+    <div class="row"><button id="btn-init">1. Handshake (INIT)</button></div>
+    <div class="row">
+        <input id="score" type="number" value="1000">
+        <button id="btn-score">2. Submit score</button>
+        <button id="btn-random">Random score</button>
+    </div>
+    <div class="row"><textarea id="save-data" rows="3" cols="40">{"level": 3, "coins": 120}</textarea></div>
+    <div class="row"><button id="btn-save">3. Save slot 0</button><button id="btn-load">4. Load slot 0</button></div>
+    <div id="log"></div>
+
+    <script type="module">
+        import { PlatformSDK, PlatformError } from './PlatformSDK.js';
+
+        const $ = (id) => document.getElementById(id);
+        const log = (text, cls = '') => {
+            const line = document.createElement('div');
+            line.className = cls;
+            line.textContent = `${new Date().toLocaleTimeString()}  ${text}`;
+            $('log').prepend(line);
+        };
+
+        const sdk = new PlatformSDK({
+            allowedHostOrigins: [
+                'http://localhost:5600', // Host Stub
+                'http://localhost:5173', // Vue 3 Portal (Vite default)
+                'http://127.0.0.1:5173'
+            ],
+            debug: true,
+            onLog: (dir, msg) => log(`${dir === 'out' ? '⇒' : '⇐'} ${msg.type} ${JSON.stringify(msg.payload ?? {})}`, 'msg'),
+        });
+
+        let revision; // tracks the last known save revision for optimistic locking
+
+        async function run(label, fn) {
+            try { log(`${label} ✓ ${JSON.stringify(await fn())}`, 'ok'); }
+            catch (e) { log(`${label} ✗ ${e instanceof PlatformError ? e.code : 'ERROR'}: ${e.message}`, 'err'); }
+        }
+
+        $('mode').textContent = sdk.isEmbedded ? '(embedded)' : '(standalone mock)';
+
+        $('btn-init').onclick = () => run('INIT', async () => {
+            const res = await sdk.init();
+            $('badge').textContent = res.user ? `👤 ${res.user.username}` : 'Guest';
+            return res;
+        });
+
+        const submit = (score) => run('SUBMIT_SCORE', () => sdk.submitScore(score, { source: 'harness' }));
+        $('btn-score').onclick = () => submit(Number($('score').value));
+        $('btn-random').onclick = () => submit(Math.floor(Math.random() * 10000));
+
+        $('btn-save').onclick = () => run('SAVE_STATE', async () => {
+            const res = await sdk.saveGame(JSON.parse($('save-data').value), { slot: 0, revision });
+            revision = res.revision;
+            return res;
+        });
+
+        $('btn-load').onclick = () => run('LOAD_STATE', async () => {
+            const res = await sdk.loadGame(0);
+            revision = res.revision || undefined;
+            if (res.data) $('save-data').value = JSON.stringify(res.data);
+            return res;
+        });
+    </script>
+</body>
+
+</html>

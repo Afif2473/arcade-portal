@@ -1,0 +1,12 @@
+services:
+  localstack:
+    image: localstack/localstack:3
+    container_name: localstack-game-portal
+    ports:
+      - "4566:4566"
+    environment:
+      - SERVICES=s3
+      - AWS_DEFAULT_REGION=us-east-1
+    volumes:
+      - ./infra/localstack/init-s3.sh:/etc/localstack/init/ready.d/init-s3.sh
+      - ./test-harness:/seed/test-harness:ro
