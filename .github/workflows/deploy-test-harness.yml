@@ -1,0 +1,54 @@
+name: Deploy test-harness to CDN
+
+on:
+  push:
+    branches: [main]
+    paths: ['test-harness/**']
+  workflow_dispatch:
+
+env:
+  AWS_REGION: ap-southeast-2
+  GAME_SLUG: test-harness
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Deploy game build to commit-scoped prefix
+        run: |
+          PREFIX="games/${GAME_SLUG}/ci-${GITHUB_SHA::7}"
+          echo "Deploying to: s3://${{ vars.GAME_BUCKET }}/${PREFIX}/"
+          
+          # Sync static assets with 1-year immutable caching
+          aws s3 sync test-harness/ "s3://${{ vars.GAME_BUCKET }}/${PREFIX}/" \
+            --exclude "index.html" --cache-control "public, max-age=31536000, immutable"
+          
+          # Upload index.html with revalidation header
+          aws s3 cp test-harness/index.html "s3://${{ vars.GAME_BUCKET }}/${PREFIX}/index.html" \
+            --cache-control "no-cache, must-revalidate"
+          
+          echo "PREFIX=${PREFIX}" >> "$GITHUB_ENV"
+
+      - name: Prove prefix isolation (Writing to another game must FAIL)
+        run: |
+          echo "Testing least-privilege boundary..."
+          if aws s3 cp test-harness/index.html "s3://${{ vars.GAME_BUCKET }}/games/other-developer-game/hack.html"; then
+            echo "❌ CRITICAL SECURITY FAILURE: Role was able to write outside its designated game folder!"
+            exit 1
+          fi
+          echo "✅ Least-privilege boundary verified: AccessDenied when attempting to write outside games/${GAME_SLUG}/"
+
+      - name: Smoke test CDN delivery
+        run: |
+          echo "Testing CloudFront response for: https://${{ vars.CDN_DOMAIN }}/${PREFIX}/index.html"
+          curl -fsSI "https://${{ vars.CDN_DOMAIN }}/${PREFIX}/index.html"
