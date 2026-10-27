@@ -5,7 +5,11 @@ echo "=========================================================="
 echo "🚀 Setting up Arcade Portal on AWS EC2 (Ubuntu 24.04)"
 echo "=========================================================="
 
-PUBLIC_IP=$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4 || curl -s ifconfig.me)
+# Robust Public IP lookup via Amazon's official checkip service (bypasses IMDSv2 token restriction)
+PUBLIC_IP=$(curl -s https://checkip.amazonaws.com | tr -d '\r\n')
+if [ -z "$PUBLIC_IP" ] || [[ "$PUBLIC_IP" == *"<"* ]]; then
+    PUBLIC_IP="13.238.201.255"
+fi
 echo "🌐 Server Public IP: $PUBLIC_IP"
 
 AWS_KEY="${1:-$AWS_ACCESS_KEY_ID}"
@@ -54,17 +58,14 @@ fi
 
 sudo chown -R ubuntu:ubuntu /var/www/web-platform
 cd /var/www/web-platform
-git pull origin main
+git fetch origin main
+git reset --hard origin/main
 
 # 5. Build Laravel Backend
 echo "⚙️ Configuring Laravel 11 Backend..."
 cd /var/www/web-platform/backend
-composer install --no-dev --optimize-autoloader
 
-if [ ! -f .env ]; then
-    cp .env.example .env
-fi
-
+cp .env.example .env
 sed -i 's/DB_CONNECTION=.*/DB_CONNECTION=mysql/' .env
 sed -i 's/DB_HOST=.*/DB_HOST=127.0.0.1/' .env
 sed -i 's/DB_PORT=.*/DB_PORT=3306/' .env
@@ -84,6 +85,7 @@ if [ -n "$AWS_KEY" ] && [ -n "$AWS_SEC" ]; then
     sed -i "s/AWS_SECRET_ACCESS_KEY=.*/AWS_SECRET_ACCESS_KEY=${AWS_SEC}/" .env || echo "AWS_SECRET_ACCESS_KEY=${AWS_SEC}" >> .env
 fi
 
+composer install --no-dev --optimize-autoloader
 php artisan key:generate --force
 php artisan migrate --seed --force
 
