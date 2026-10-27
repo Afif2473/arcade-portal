@@ -5,7 +5,7 @@ echo "=========================================================="
 echo "🚀 Setting up Arcade Portal on AWS EC2 (Ubuntu 24.04)"
 echo "=========================================================="
 
-# Robust Public IP lookup via Amazon's official checkip service (bypasses IMDSv2 token restriction)
+# Robust Public IP lookup via Amazon's official checkip service
 PUBLIC_IP=$(curl -s https://checkip.amazonaws.com | tr -d '\r\n')
 if [ -z "$PUBLIC_IP" ] || [[ "$PUBLIC_IP" == *"<"* ]]; then
     PUBLIC_IP="13.238.201.255"
@@ -65,28 +65,60 @@ git reset --hard origin/main
 echo "⚙️ Configuring Laravel 11 Backend..."
 cd /var/www/web-platform/backend
 
-cp .env.example .env
-sed -i 's/DB_CONNECTION=.*/DB_CONNECTION=mysql/' .env
-sed -i 's/DB_HOST=.*/DB_HOST=127.0.0.1/' .env
-sed -i 's/DB_PORT=.*/DB_PORT=3306/' .env
-sed -i 's/DB_DATABASE=.*/DB_DATABASE=game_portal/' .env
-sed -i 's/DB_USERNAME=.*/DB_USERNAME=portal_user/' .env
-sed -i 's/DB_PASSWORD=.*/DB_PASSWORD=PortalSecure2026!/' .env
-sed -i "s|APP_URL=.*|APP_URL=http://${PUBLIC_IP}|" .env
-sed -i 's/AWS_DEFAULT_REGION=.*/AWS_DEFAULT_REGION=ap-southeast-2/' .env
-sed -i 's/AWS_BUCKET=.*/AWS_BUCKET=game-portal-assets-208588112005/' .env
-sed -i 's/AWS_USE_PATH_STYLE_ENDPOINT=.*/AWS_USE_PATH_STYLE_ENDPOINT=false/' .env
-sed -i 's|AWS_ENDPOINT=.*|# AWS_ENDPOINT=|' .env
-sed -i 's|GAME_CDN_URL=.*|GAME_CDN_URL=https://dsdy2lr3h1so9.cloudfront.net|' .env
-sed -i 's/GAME_ASSETS_DISK=.*/GAME_ASSETS_DISK=s3/' .env
+cat <<ENV > .env
+APP_NAME="Arcade Portal"
+APP_ENV=production
+APP_KEY=
+APP_DEBUG=false
+APP_TIMEZONE=UTC
+APP_URL=http://${PUBLIC_IP}
 
-if [ -n "$AWS_KEY" ] && [ -n "$AWS_SEC" ]; then
-    sed -i "s/AWS_ACCESS_KEY_ID=.*/AWS_ACCESS_KEY_ID=${AWS_KEY}/" .env || echo "AWS_ACCESS_KEY_ID=${AWS_KEY}" >> .env
-    sed -i "s/AWS_SECRET_ACCESS_KEY=.*/AWS_SECRET_ACCESS_KEY=${AWS_SEC}/" .env || echo "AWS_SECRET_ACCESS_KEY=${AWS_SEC}" >> .env
-fi
+APP_LOCALE=en
+APP_FALLBACK_LOCALE=en
+APP_FAKER_LOCALE=en_US
+
+APP_MAINTENANCE_DRIVER=file
+
+BCRYPT_ROUNDS=12
+
+LOG_CHANNEL=stack
+LOG_STACK=single
+LOG_DEPRECATIONS_CHANNEL=null
+LOG_LEVEL=debug
+
+DB_CONNECTION=mysql
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_DATABASE=game_portal
+DB_USERNAME=portal_user
+DB_PASSWORD=PortalSecure2026!
+
+SESSION_DRIVER=database
+SESSION_LIFETIME=120
+SESSION_ENCRYPT=false
+SESSION_PATH=/
+SESSION_DOMAIN=null
+
+BROADCAST_CONNECTION=log
+FILESYSTEM_DISK=s3
+QUEUE_CONNECTION=database
+
+CACHE_STORE=database
+CACHE_PREFIX=
+
+AWS_ACCESS_KEY_ID=${AWS_KEY}
+AWS_SECRET_ACCESS_KEY=${AWS_SEC}
+AWS_DEFAULT_REGION=ap-southeast-2
+AWS_BUCKET=game-portal-assets-208588112005
+AWS_USE_PATH_STYLE_ENDPOINT=false
+
+GAME_ASSETS_DISK=s3
+GAME_CDN_URL=https://dsdy2lr3h1so9.cloudfront.net
+ENV
 
 composer install --no-dev --optimize-autoloader
 php artisan key:generate --force
+php artisan config:clear
 php artisan migrate --seed --force
 
 # 6. Build Vue 3 Frontend
