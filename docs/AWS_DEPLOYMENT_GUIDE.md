@@ -46,14 +46,24 @@ Player's browser
 
 **Analogy:** a smoke detector. The zero-spend budget emails you as soon as anything costs even one cent.
 
-### A5. Create your daily admin identity (instead of root)
-1. Search **IAM** → **Users** → **Create user** → name `afif-admin` → check **Provide user access to the AWS Management Console**.
-2. Permissions → **Attach policies directly** → `AdministratorAccess` → Create.
-3. Sign out of root and sign in as `afif-admin` using the account sign-in URL shown on the IAM dashboard. Turn on MFA for this user too.
-4. In IAM → Users → `afif-admin` → **Security credentials** → **Create access key** → choose **Command Line Interface (CLI)** → save the key ID and secret. They're shown only once.
+### A5. Create your CLI identity (`afif-admin`)
 
 > [!NOTE]
-> Professional teams use **IAM Identity Center (SSO)** with short-lived credentials instead of long-lived access keys. An admin IAM user with MFA is fine for learning. We'll get rid of long-lived keys for CI in Part B5.
+> **Newer AWS consoles** show a banner: *"IAM users should only be used for programmatic access."* The option to give an IAM user a console password is gone. People log in to the console through the **team page** (IAM Identity Center). So we split the roles:
+> - **Console (clicking in the browser):** keep using the login you already have, protected by MFA (A3).
+> - **CLI / Terraform (terminal):** use the `afif-admin` IAM user with an access key.
+
+1. **IAM → IAM users → `afif-admin`**. If it doesn't exist, click **Create user** with that name. There's no console checkbox to look for anymore.
+2. **Permissions** tab → **Add permissions → Attach policies directly** → tick `AdministratorAccess` → **Add permissions**. Skip this if the policy is already listed.
+3. **Security credentials** tab → **Access keys → Create access key** → use case **Command Line Interface (CLI)** → tick the confirmation box → **Next** → description `wsl-laptop` → **Create access key**.
+4. Click **Download .csv file**, or copy both values right away. **The secret is shown only once.** Never paste it into a file inside the repo.
+
+> [!TIP]
+> Optional, for later: invite yourself on the **team page** so you stop signing in to the console as the account owner day to day. That's the modern, recommended setup. It isn't required to continue this guide.
+
+> [!NOTE]
+> Professional teams use **IAM Identity Center (SSO)** with short-lived credentials instead of long-lived access keys. An admin access key on your own laptop is fine for learning. We'll get rid of long-lived keys for CI in Part B5.
+
 
 ### A6. Install the AWS CLI v2 in WSL
 
@@ -64,12 +74,12 @@ sudo apt install -y unzip && unzip -q awscliv2.zip && sudo ./aws/install
 aws --version            # aws-cli/2.x ...
 
 aws configure            # paste the afif-admin key + secret
-#   Default region name: ap-southeast-1
+#   Default region name: ap-southeast-2
 #   Default output format: json
 ```
 
 > [!TIP]
-> **Region:** `ap-southeast-1` (Singapore) is the region closest to your UTC+8 time zone, so uploads from Laravel are faster. CloudFront itself is global, so players everywhere still get edge caching.
+> **Region:** `ap-southeast-2` (Sydney). Free-plan accounts are locked to one "project" region, and yours is Sydney. Do **not** click "Activate advanced features" just to change region, because that upgrades you to the paid plan. CloudFront is global, so players everywhere still get edge caching.
 
 ### ✅ Check A
 ```bash
@@ -88,7 +98,7 @@ S3 → **Create bucket**:
 
 | Setting | Value | Why |
 |---|---|---|
-| Region | `ap-southeast-1` | Close to you |
+| Region | `ap-southeast-2` | Close to you |
 | Bucket name | `game-portal-assets-<ACCOUNT_ID>` | Bucket names are global; adding the account ID makes it unique |
 | Object Ownership | **ACLs disabled (Bucket owner enforced)** | Turns off old ACL permissions; only policies control access |
 | Block *all* public access | ✅ **ON** | Nobody gets direct access to the vault |
@@ -100,7 +110,7 @@ CloudFront → **Create distribution**. The wizard's layout changes now and then
 | Setting | Value |
 |---|---|
 | Pricing plan (if asked) | **Free** / pay-as-you-go. Do **not** choose a paid flat-rate tier |
-| Origin type / domain | Amazon S3 → choose your bucket (`game-portal-assets-<id>.s3.ap-southeast-1.amazonaws.com`). **Not** the "website endpoint" |
+| Origin type / domain | Amazon S3 → choose your bucket (`game-portal-assets-<id>.s3.ap-southeast-2.amazonaws.com`). **Not** the "website endpoint" |
 | Origin access | **Origin access control settings (recommended)** → *Create new OAC* → Signing: **Sign requests** |
 | Viewer protocol policy | **Redirect HTTP to HTTPS** |
 | Allowed HTTP methods | `GET, HEAD` |
@@ -149,7 +159,7 @@ CDN=dxxxxxxxxxxxx.cloudfront.net    # "Distribution domain name" in the console
 curl -sI https://$CDN/games/test-harness/v1/index.html | head -1
 
 # 2. Directly from S3 → 403 AccessDenied (proves Block Public Access works)
-curl -sI https://$BUCKET.s3.ap-southeast-1.amazonaws.com/games/test-harness/v1/index.html | head -1
+curl -sI https://$BUCKET.s3.ap-southeast-2.amazonaws.com/games/test-harness/v1/index.html | head -1
 ```
 
 ### B4. IAM user for Laravel (local dev only)
@@ -258,7 +268,7 @@ permissions:
   contents: read
 
 env:
-  AWS_REGION: ap-southeast-1
+  AWS_REGION: ap-southeast-2
   GAME_SLUG: test-harness
 
 jobs:
@@ -317,7 +327,7 @@ Commit, push, then GitHub → **Actions** → *Deploy test-harness to CDN* → *
 # --- Real AWS ---
 AWS_ACCESS_KEY_ID=<game-portal-backend-local key>
 AWS_SECRET_ACCESS_KEY=<secret>
-AWS_DEFAULT_REGION=ap-southeast-1
+AWS_DEFAULT_REGION=ap-southeast-2
 AWS_BUCKET=game-portal-assets-<ACCOUNT_ID>
 AWS_USE_PATH_STYLE_ENDPOINT=false
 GAME_ASSETS_DISK=s3
@@ -393,7 +403,7 @@ data "aws_caller_identity" "current" {}
 ```hcl
 variable "aws_region" {
   type    = string
-  default = "ap-southeast-1"
+  default = "ap-southeast-2"
 }
 
 variable "project" {
@@ -683,7 +693,7 @@ aws s3 cp test-harness/index.html s3://$BUCKET/games/test-harness/v1/index.html 
 |---|---|---|
 | 1 | `terraform plan` (run again) | `No changes. Your infrastructure matches the configuration.` |
 | 2 | `curl -sI https://$CDN/games/test-harness/v1/index.html \| head -1` | `HTTP/2 200` |
-| 3 | `curl -sI https://$BUCKET.s3.ap-southeast-1.amazonaws.com/games/test-harness/v1/index.html \| head -1` | `HTTP/1.1 403` |
+| 3 | `curl -sI https://$BUCKET.s3.ap-southeast-2.amazonaws.com/games/test-harness/v1/index.html \| head -1` | `HTTP/1.1 403` |
 | 4 | Re-run the GitHub workflow | Green, isolation step prints `✅ AccessDenied` |
 | 5 | Upload a zip in Studio → play it | iframe loads from CloudFront, handshake and score submission work |
 
