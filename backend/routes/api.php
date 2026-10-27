@@ -6,14 +6,18 @@ use App\Http\Controllers\Api\GameScoreController;
 use App\Http\Controllers\Api\DeveloperGameController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\Api\AuthController;
 
 // Public catalog & game details
 Route::get('/games', [GameCatalogController::class, 'index']);
 Route::get('/games/{slug}', [GameCatalogController::class, 'show']);
 Route::get('/games/{slug}/leaderboard', [GameScoreController::class, 'leaderboard']);
+Route::post('/auth/register', [AuthController::class, 'register']);
+Route::post('/auth/login', [AuthController::class, 'login']);
 
 // Authenticated player routes (Sanctum)
 Route::middleware('auth:sanctum')->group(function () {
+    Route::post('/auth/logout', [AuthController::class, 'logout']);
     Route::get('/user', function (Request $request) {
         return $request->user();
     });
