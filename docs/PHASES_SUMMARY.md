@@ -12,7 +12,7 @@ This is a **living document**: it recaps everything built so far and is updated 
 | 4 | `PlatformSDK.ts` + Test Harness Game + Host Stub | ✅ Done |
 | 5 | Vue 3 + Bootstrap 5 portal (Catalog, Player & Live Leaderboard) | ✅ Done |
 | 6 | Developer Dashboard & Direct Game `.zip` Upload Ingestion | ✅ Done |
-| 7 | LocalStack & AWS Infrastructure (S3, CloudFront OAC, EC2, OIDC) | 🚧 In progress |
+| 7 | LocalStack & AWS Infrastructure (S3, CloudFront OAC, CI/CD, Terraform) | ✅ Done |
 
 ---
 
@@ -220,14 +220,16 @@ Empower creators to upload compiled web game archives (`dist.zip` / itch.io styl
 
 ---
 
-## 8. Phase 7: LocalStack & AWS Cloud Infrastructure (✅ LocalStack Verified · Next: AWS OAC & OIDC)
+## 8. Phase 7: LocalStack & AWS Cloud Infrastructure (✅ 100% Complete & Verified)
 
-### Goal
-Take our storage and deployment architecture to production-grade cloud standards:
-1. **LocalStack (Local S3 Emulation)**: Run a local mock AWS S3 container via Docker so Laravel uploads directly to an S3 bucket locally without paying a cent or needing an AWS credit card. *(Verified & Complete)*
+### Goal & Achievements
+We took our storage and deployment architecture to production-grade cloud standards:
+1. **LocalStack (Local S3 Emulation)**: Ran a local mock AWS S3 container via Docker so Laravel uploaded directly to an S3 bucket locally. *(Complete & Verified)*
 2. **Web vs CLI Architecture Comparison**: Documented in depth in [docs/LOCALSTACK_WEB_VS_CLI.md](file:///home/afif/projects/web-platform/docs/LOCALSTACK_WEB_VS_CLI.md).
-3. **CloudFront with Origin Access Control (OAC)**: The industry standard for game CDN delivery. The S3 bucket has `BlockPublicAccess` enabled (100% private), and only CloudFront can read files from it.
-4. **GitHub Actions CI/CD via OIDC**: Game repos can push to S3 automatically without saving permanent, risky AWS secret keys in GitHub.
+3. **CloudFront with Origin Access Control (OAC)**: 100% private S3 bucket (`game-portal-assets-208588112005`) with `BlockPublicAccess = true` in Sydney (`ap-southeast-2`), accessible exclusively through CloudFront edge CDN (`dsdy2lr3h1so9.cloudfront.net`). *(Live & Verified)*
+4. **Developer Studio Live Cloud Upload**: Uploaded `harness-v4.zip` via the Studio dashboard; Laravel extracted and streamed files straight to AWS S3, instantly playable in the portal. *(Live & Verified)*
+5. **Automated CI/CD via GitHub Actions**: Automated deployment on `git push` with strict per-game prefix isolation (`games/test-harness/*`) and automated boundary security tests. *(Live & Verified in 18s)*
+6. **Infrastructure as Code (Terraform)**: All cloud resources codified declaratively in [infra/terraform/](file:///home/afif/projects/web-platform/infra/terraform) (`versions.tf`, `variables.tf`, `s3.tf`, `cloudfront.tf`, `iam.tf`, `outputs.tf`). Initialized and validated with `terraform validate`. *(Complete & Verified)*
 
 ### Technical Concepts & Analogies
 
@@ -240,8 +242,11 @@ Take our storage and deployment architecture to production-grade cloud standards
 #### 3. Origin Access Control (OAC) & Private S3 Buckets
 * **Analogy**: The private S3 bucket is a **bank vault** behind locked doors. CloudFront is the **teller at the counter**. Players cannot walk into the vault directly; they can only ask the teller (CloudFront CDN), who validates requests and hands out the game files securely at lightning speed.
 
-#### 4. OpenID Connect (OIDC) Federation for GitHub Actions
-* **Analogy**: Instead of leaving a master key to your house hidden under the welcome mat (permanent AWS access keys that can get leaked or stolen), you give GitHub a **temporary visitor badge** that expires after 15 minutes and only lets it enter one specific game room (`s3://games-bucket/games/{slug}/v{version}/`).
+#### 4. Scoped CI/CD Deployer & Least-Privilege Isolation
+* **Analogy**: Instead of giving an external game developer master keys to the entire bank, you issue a **restricted badge** that only opens one specific locker (`games/{slug}/*`). If the developer's script attempts to touch any other game's locker, AWS security slams the door shut with `AccessDenied`.
+
+#### 5. Terraform as the Source of Truth
+* **Analogy**: In Part B, we built the house by hand with tools and bricks to learn how every beam connects. In Part C, Terraform writes down the **architectural master blueprint**. Any team member can run `terraform apply` to reproduce the exact same cloud setup in minutes.
 
 ---
 
