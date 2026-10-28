@@ -162,12 +162,13 @@ server {
         location ~ \.php$ {
             include snippets/fastcgi-php.conf;
             fastcgi_param SCRIPT_FILENAME /var/www/web-platform/backend/public/index.php;
+            fastcgi_param SCRIPT_NAME /index.php;
             fastcgi_pass unix:/run/php/php8.3-fpm.sock;
         }
     }
 
     location @laravel {
-        rewrite /api/(.*)$ /api/index.php last;
+        rewrite ^/api/(.*)$ /api/index.php?$query_string last;
     }
 
     location ~ /\.ht {
