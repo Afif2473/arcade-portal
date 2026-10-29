@@ -26,6 +26,36 @@ class DeveloperGameController extends Controller
         return response()->json(['data' => $games]);
     }
 
+    public function store(Request $request): JsonResponse
+    {
+        // Enforce developer or admin role
+        if ($request->user()->role !== 'developer' && $request->user()->role !== 'admin') {
+            return response()->json(['message' => 'Unauthorized: Developer role required.'], 403);
+        }
+        $validated = $request->validate([
+            'title' => ['required', 'string', 'max:128'],
+            'slug' => ['required', 'string', 'max:64', 'unique:games,slug', 'regex:/^[a-z0-9\-]+$/'],
+            'short_description' => ['nullable', 'string', 'max:280'],
+            'description' => ['nullable', 'string'],
+            'aspect_ratio' => ['nullable', 'in:16:9,4:3,9:16'],
+            'score_sort' => ['nullable', 'in:desc,asc'],
+        ]);
+        $game = Game::create([
+            'developer_id' => $request->user()->id,
+            'title' => $validated['title'],
+            'slug' => $validated['slug'],
+            'short_description' => $validated['short_description'] ?? null,
+            'description' => $validated['description'] ?? null,
+            'aspect_ratio' => $validated['aspect_ratio'] ?? '16:9',
+            'score_sort' => $validated['score_sort'] ?? 'desc',
+            'status' => 'draft',
+        ]);
+        return response()->json([
+            'message' => 'Game registered successfully.',
+            'game' => $game,
+        ], 201);
+    }
+
     /**
      * Upload a new .zip release bundle for a game
      */

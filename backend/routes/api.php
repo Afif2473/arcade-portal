@@ -22,6 +22,7 @@ Route::middleware('auth:sanctum')->group(function () {
         return $request->user();
     });
     Route::prefix('developer')->group(function () {
+        Route::post('/games', [DeveloperGameController::class, 'store']);
         Route::get('/games', [DeveloperGameController::class, 'index']);
         Route::post('/games/{slug}/upload', [DeveloperGameController::class, 'uploadBundle']);
         Route::patch('/games/{slug}', [DeveloperGameController::class, 'updateStatus']);
