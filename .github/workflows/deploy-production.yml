@@ -14,7 +14,7 @@ jobs:
   # Phase 1: CI - Test Backend
   # ========================================================
   test-backend:
-    name: CI: Test Backend (laravel)
+    name: "CI: Test Backend (laravel)"
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
