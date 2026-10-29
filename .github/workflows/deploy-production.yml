@@ -1,0 +1,106 @@
+name: Production CI/CD Pipeline
+
+on:
+  push:
+    branches:[main]
+  workflow_dispatch:
+
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
+jobs:
+  # ========================================================
+  # Phase 1: CI - Test Backend
+  # ========================================================
+  test-backend:
+    name: CI: Test Backend (laravel)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: mbstring, xml, ctype, iconv, mysql, pdo_sqlite
+          coverage: none
+
+      - name: Install Composer Dependencies
+        run: |
+          cd backend
+          composer install --prefer-dist --no-interaction --no-progress
+      
+      - name: Run Backend Tests
+        run: |
+          cd backend
+          cp .env.example .env.testing
+          php artisan key:generate --env=testing
+          php artisan test --env===testing
+
+  # ========================================================
+  # Phase 2: CI - Verify Frontend Build
+  # ========================================================
+
+  build-frontend:
+    name: CI: Build Frontend (Vue 3)
+    runs-on: ubuntu-latest
+    steps: 
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install and Build Vue App
+        run: |
+          cd frontend
+          npm ci
+          npm run build
+
+  # ========================================================
+  # Phase 3: CD - Deploy to AWS EC2
+  # ========================================================
+  deploy-to-ec2:
+    name: CD: Deploy to EC2
+    needs: [test-backend, build-frontend]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v.1.0.3
+        with:
+          host: '13.238.201.255'
+          username: ubuntu
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            echo "Starting automated deployment on EC2..."
+            cd /var/www/web-platform
+
+            # 1. Pull latest Code
+            git fetch origin main
+            git reset --hard origin/main
+
+            # 2. Update Backend
+            cd backend
+            composer install --no-dev --optimize-autoloader
+            php artisan migrate --force
+            php artisan config:clear
+            php artisan route:clear
+            php artisan cache:clear
+
+            # 3. Build Frontend
+            cd ../frontend
+            npm ci
+            npm run build
+
+            # 4. Reload Nginx
+            sudo nginx -t
+            sudo systemctl reload nginx
+
+            echo "Deployment complete and verified live!"
