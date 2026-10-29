@@ -44,7 +44,7 @@ jobs:
   # ========================================================
 
   build-frontend:
-    name: CI: Build Frontend (Vue 3)
+    name: "CI: Build Frontend (Vue 3)"
     runs-on: ubuntu-latest
     steps: 
       - name: Checkout Code
@@ -67,7 +67,7 @@ jobs:
   # Phase 3: CD - Deploy to AWS EC2
   # ========================================================
   deploy-to-ec2:
-    name: CD: Deploy to EC2
+    name: "CD: Deploy to EC2"
     needs: [test-backend, build-frontend]
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
