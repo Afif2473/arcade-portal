@@ -2,7 +2,7 @@ name: Production CI/CD Pipeline
 
 on:
   push:
-    branches:[main]
+    branches: [main]
   workflow_dispatch:
 
 concurrency:
@@ -37,7 +37,7 @@ jobs:
           cd backend
           cp .env.example .env.testing
           php artisan key:generate --env=testing
-          php artisan test --env===testing
+          php artisan test --env=testing
 
   # ========================================================
   # Phase 2: CI - Verify Frontend Build
@@ -73,7 +73,7 @@ jobs:
     if: github.ref == 'refs/heads/main'
     steps:
       - name: Deploy via SSH
-        uses: appleboy/ssh-action@v.1.0.3
+        uses: appleboy/ssh-action@v1.0.3
         with:
           host: '13.238.201.255'
           username: ubuntu
