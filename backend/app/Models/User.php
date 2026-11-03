@@ -64,4 +64,9 @@ class User extends Authenticatable
         return $this->belongsToMany(Game::class, 'user_game_favorites')
                     ->withPivot('created_at');
     }
+
+    public function sendPasswordResetNotification($token): void
+    {
+        $this->notify(new \App\Notifications\ResetPasswordNotification($token));
+    }
 }
