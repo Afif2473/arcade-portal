@@ -1,6 +1,7 @@
 <script setup>
 import { ref } from 'vue';
 import { useAuthStore } from '../stores/auth';
+import apiClient from '../api/client'; // <--- ADD THIS IMPORT
 
 const props = defineProps({
   isOpen: Boolean
@@ -8,7 +9,7 @@ const props = defineProps({
 const emit = defineEmits(['close']);
 
 const authStore = useAuthStore();
-const mode = ref('login'); // 'login' or 'register'
+const mode = ref('login'); // 'login', 'register', or 'forgot'
 
 // Form fields
 const loginField = ref('');
@@ -18,6 +19,7 @@ const email = ref('');
 const role = ref('player'); // 'player' or 'developer'
 
 const errorMessage = ref('');
+const successMessage = ref(''); // <--- ADD THIS REF
 const isLoading = ref(false);
 
 async function handleSubmit() {
@@ -27,10 +29,14 @@ async function handleSubmit() {
   try {
     if (mode.value === 'login') {
       await authStore.login(loginField.value.trim(), password.value);
-    } else {
+      emit('close');
+    } else if (mode.value === 'register'){
       await authStore.register(username.value.trim(), email.value.trim(), password.value, role.value);
+      emit('close');
+    } else if (mode.value === 'forgot'){
+      const res = await apiClient.post('/auth/forgot-password', {email: email.value.trim() });
+      successMessage.value = res.data.message;
     }
-    emit('close');
   } catch (err) {
     if (err.response?.data?.errors) {
       errorMessage.value = Object.values(err.response.data.errors).flat().join(' ');
@@ -130,22 +136,55 @@ async function handleSubmit() {
               </div>
             </template>
 
-            <!-- Password -->
-            <div class="mb-3">
-              <label class="form-label small text-secondary">Password</label>
-              <input
-                v-model="password"
-                type="password"
-                class="form-control bg-dark border-secondary text-light"
-                placeholder="••••••••"
-                required
-              />
-            </div>
+            <!-- Password (Only for Login & Register) -->
+            <template v-if="mode !== 'forgot'">
+              <div class="mb-3">
+                <label class="form-label small text-secondary">Password</label>
+                <input
+                  v-model="password"
+                  type="password"
+                  class="form-control bg-dark border-secondary text-light"
+                  placeholder="••••••••"
+                  required
+                />
+              </div>
 
-            <button type="submit" class="btn btn-primary w-100 mt-2" :disabled="isLoading">
-              <span v-if="isLoading" class="spinner-border spinner-border-sm me-1"></span>
-              {{ mode === 'login' ? 'Sign In' : 'Create Account' }}
-            </button>
+              <!-- Forgot Password link (only in login mode) -->
+              <div v-if="mode === 'login'" class="d-flex justify-content-end mb-3">
+                <a href="#" class="text-info small text-decoration-none" @click.prevent="mode = 'forgot'; errorMessage = ''; successMessage = ''">
+                  Forgot Password?
+                </a>
+              </div>
+
+              <!-- Submit Button for Login / Register -->
+              <button type="submit" class="btn btn-primary w-100 mt-2" :disabled="isLoading">
+                <span v-if="isLoading" class="spinner-border spinner-border-sm me-1"></span>
+                {{ mode === 'login' ? 'Sign In' : 'Create Account' }}
+              </button>
+            </template>
+
+            <!-- Forgot Password Mode -->
+            <div v-if="mode === 'forgot'">
+              <p class="text-secondary small mb-3">
+                Enter your registered email address and we will send you a password reset link.
+              </p>
+              <div v-if="successMessage" class="alert alert-success py-2 small">{{ successMessage }}</div>
+              <div v-if="errorMessage" class="alert alert-danger py-2 small">{{ errorMessage }}</div>
+
+              <div class="mb-3">
+                <label class="form-label small text-secondary">Email Address</label>
+                <input v-model="email" type="email" class="form-control bg-dark text-light border-secondary" placeholder="you@example.com" required />
+              </div>
+              <button type="submit" class="btn btn-primary w-100 mb-2" :disabled="isLoading">
+                <span v-if="isLoading" class="spinner-border spinner-border-sm me-1"></span>
+                Send Reset Link
+              </button>
+              <div class="text-center">
+                <button type="button" class="btn btn-link btn-sm text-secondary" @click="mode = 'login'; errorMessage = ''; successMessage = ''">
+                  &larr; Back to Sign In
+                </button>
+              </div>
+            </div>
           </form>
         </div>
       </div>
