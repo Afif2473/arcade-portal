@@ -1,16 +1,22 @@
 import { createRouter, createWebHistory } from 'vue-router';
+import HomeView from '../views/HomeView.vue';
 import CatalogView from '../views/CatalogView.vue';
 import GameView from '../views/GameView.vue';
 import DeveloperDashboardView from '../views/DeveloperDashboardView.vue';
-import { useAuthStore } from '../stores/auth';
 import ResetPasswordView from '../views/ResetPasswordView.vue';
+import { useAuthStore } from '../stores/auth';
 
 const router = createRouter({
     history: createWebHistory(import.meta.env.BASE_URL),
     routes: [
         {
             path: '/',
-            name: 'catalog',
+            name: 'home',
+            component: HomeView,
+        },
+        {
+            path: '/games',
+            name: 'games',
             component: CatalogView,
         },
         {
@@ -35,7 +41,6 @@ const router = createRouter({
 router.beforeEach(async (to, from, next) => {
     const authStore = useAuthStore();
 
-    // Ensure user profile is loaded if token exists
     if (authStore.token && !authStore.user) {
         await authStore.fetchUser();
     }

@@ -47,7 +47,6 @@ async function fetchLeaderboard() {
   }
 }
 
-// Security bridge composable
 useGameBridge({
   iframeRef,
   game: computed(() => game.value || { slug }),
@@ -75,39 +74,33 @@ onMounted(() => {
 </script>
 
 <template>
-  <div v-if="loading" class="text-center py-5">
-    <div class="spinner-border text-primary" role="status"></div>
+  <div v-if="loading" class="empty-state">
+    Loading...
   </div>
 
-  <div v-else-if="!game" class="alert alert-danger">
+  <div v-else-if="!game" class="empty-state">
     Game not found.
   </div>
 
-  <div v-else>
-    <!-- Sandbox Notice -->
-    <div v-if="game.status === 'sandbox'" class="alert alert-warning py-2 mb-3 d-flex align-items-center gap-2">
-      <i class="bi bi-cone-striped"></i>
-      <span><strong>Sandbox Mode:</strong> Only developers and admins can play and submit scores for this game.</span>
-    </div>
-
-    <!-- Title & Controls Header -->
-    <div class="d-flex align-items-center justify-content-between mb-3">
+  <div v-else class="game-view">
+    <!-- Header -->
+    <div class="game-header">
       <div>
-        <h2 class="fw-bold mb-0 text-light">{{ game.title }}</h2>
-        <span class="text-secondary small">Version {{ game.active_version?.version || 1 }}</span>
+        <h1>{{ game.title }}</h1>
+        <span class="muted">Version {{ game.active_version?.version || 1 }}</span>
       </div>
-      <div class="d-flex gap-2">
-        <button class="btn btn-outline-secondary btn-sm" @click="reloadGame" title="Restart Game">
+      <div class="header-actions">
+        <button class="btn btn-secondary" @click="reloadGame" title="Reload">
           <i class="bi bi-arrow-clockwise"></i> Reload
         </button>
-        <button class="btn btn-outline-primary btn-sm" @click="toggleFullscreen" title="Fullscreen">
+        <button class="btn btn-secondary" @click="toggleFullscreen" title="Fullscreen">
           <i class="bi bi-arrows-fullscreen"></i> Fullscreen
         </button>
       </div>
     </div>
 
-    <!-- Game Viewport Frame -->
-    <div class="card bg-black border-secondary shadow-lg overflow-hidden mb-4">
+    <!-- Viewport -->
+    <div class="viewport-frame card">
       <div class="ratio" :class="aspectRatioClass">
         <iframe
           ref="iframeRef"
@@ -119,61 +112,95 @@ onMounted(() => {
       </div>
     </div>
 
-    <!-- Live Submission Feedback Toast/Banner -->
-    <div v-if="recentScoreNotice" class="alert alert-success py-2 d-flex align-items-center justify-content-between mb-4">
-      <span>
-        <i class="bi bi-trophy-fill text-warning me-2"></i>
-        New run submitted! Score: <strong>{{ recentScoreNotice.score }}</strong>
-        (Rank: #{{ recentScoreNotice.rank }})
-      </span>
-      <span v-if="recentScoreNotice.is_new_best" class="badge bg-warning text-dark">Personal Best!</span>
+    <!-- Recent Score Submission Notice -->
+    <div v-if="recentScoreNotice" class="score-notice">
+      <span>Score submitted: {{ recentScoreNotice.score }} (Rank #{{ recentScoreNotice.rank }})</span>
     </div>
 
-    <!-- Details & Leaderboard Row -->
-    <div class="row g-4">
-      <div class="col-12 col-lg-7">
-        <div class="card p-4 h-100 border-secondary">
-          <h5 class="fw-bold text-light mb-3">About this Game</h5>
-          <p class="text-secondary">{{ game.description || game.short_description || 'No description provided.' }}</p>
-        </div>
+    <!-- Details & Leaderboard -->
+    <div class="game-info-grid">
+      <!-- Description -->
+      <div class="card p-16">
+        <h2>About</h2>
+        <p class="muted">
+          {{ game.description || game.short_description || 'No description provided.' }}
+        </p>
       </div>
 
-      <div class="col-12 col-lg-5">
-        <div class="card p-4 h-100 border-secondary">
-          <h5 class="fw-bold text-light mb-3 d-flex align-items-center justify-content-between">
-            <span><i class="bi bi-trophy text-warning me-2"></i>Leaderboard</span>
-            <span class="badge bg-dark border border-secondary text-secondary fs-6">{{ leaderboard.length }} entries</span>
-          </h5>
+      <!-- Leaderboard -->
+      <div class="card p-16">
+        <h2>Leaderboard</h2>
 
-          <div v-if="leaderboard.length === 0" class="text-center py-4 text-secondary small">
-            No scores submitted yet. Be the first!
-          </div>
-
-          <div v-else class="table-responsive">
-            <table class="table table-dark table-hover table-sm align-middle mb-0">
-              <thead>
-                <tr class="text-secondary small">
-                  <th>#</th>
-                  <th>Player</th>
-                  <th class="text-end">Best Score</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="(entry, index) in leaderboard" :key="entry.user.id">
-                  <td>
-                    <span v-if="index === 0" class="badge bg-warning text-dark">1</span>
-                    <span v-else-if="index === 1" class="badge bg-secondary text-light">2</span>
-                    <span v-else-if="index === 2" class="badge bg-bronze text-light" style="background-color: #cd7f32;">3</span>
-                    <span v-else class="text-secondary small ms-2">{{ index + 1 }}</span>
-                  </td>
-                  <td class="fw-semibold">{{ entry.user.username }}</td>
-                  <td class="text-end text-primary fw-bold">{{ entry.best_score.toLocaleString() }}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
+        <div v-if="leaderboard.length === 0" class="empty-state">
+          No scores yet.
         </div>
+
+        <table v-else class="table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Player</th>
+              <th style="text-align: right;">Score</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="(entry, index) in leaderboard" :key="entry.user.id">
+              <td class="muted">{{ index + 1 }}</td>
+              <td>{{ entry.user.username }}</td>
+              <td style="text-align: right; font-weight: 600;">{{ entry.best_score.toLocaleString() }}</td>
+            </tr>
+          </tbody>
+        </table>
       </div>
     </div>
   </div>
 </template>
+
+<style scoped>
+.game-view {
+  max-width: 960px;
+}
+
+.game-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: var(--sp-16);
+}
+
+.header-actions {
+  display: flex;
+  gap: var(--sp-8);
+}
+
+.viewport-frame {
+  margin-bottom: var(--sp-24);
+  background-color: #000 !important;
+  overflow: hidden;
+}
+
+.score-notice {
+  background-color: var(--surface);
+  border: 1px solid var(--border);
+  padding: var(--sp-8) var(--sp-16);
+  margin-bottom: var(--sp-24);
+  font-size: var(--fs-13);
+  color: var(--text);
+}
+
+.game-info-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--sp-16);
+}
+
+.p-16 {
+  padding: var(--sp-16) !important;
+}
+
+@media (max-width: 768px) {
+  .game-info-grid {
+    grid-template-columns: 1fr;
+  }
+}
+</style>

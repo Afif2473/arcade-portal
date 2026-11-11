@@ -1,10 +1,9 @@
 <script setup>
 import { ref, onMounted } from 'vue';
-import { useRoute, useRouter, RouterLink } from 'vue-router';
+import { useRoute, RouterLink } from 'vue-router';
 import apiClient from '../api/client';
 
 const route = useRoute();
-const router = useRouter();
 
 const token = ref('');
 const email = ref('');
@@ -19,7 +18,7 @@ onMounted(() => {
   token.value = route.query.token || '';
   email.value = route.query.email || '';
   if (!token.value || !email.value) {
-    errorMessage.value = 'Invalid password reset link. Please request a new one.';
+    errorMessage.value = 'Invalid or expired password reset link.';
   }
 });
 
@@ -37,7 +36,7 @@ async function handleReset() {
     });
     successMessage.value = res.data.message;
   } catch (err) {
-    errorMessage.value = err.response?.data?.message || 'Failed to reset password. The link may have expired.';
+    errorMessage.value = err.response?.data?.message || 'Failed to reset password.';
   } finally {
     isLoading.value = false;
   }
@@ -45,47 +44,55 @@ async function handleReset() {
 </script>
 
 <template>
-  <div class="row justify-content-center py-5">
-    <div class="col-12 col-md-6 col-lg-5">
-      <div class="card bg-dark border-secondary shadow-lg">
-        <div class="card-body p-4">
-          <h4 class="fw-bold text-light mb-1">Set New Password</h4>
-          <p class="text-secondary small mb-4">Enter a strong new password for your account.</p>
+  <div class="reset-wrapper">
+    <div class="reset-card card">
+      <h2>Set New Password</h2>
+      <p class="muted">Enter a new password for your account.</p>
 
-          <div v-if="successMessage" class="alert alert-success py-3">
-            <i class="bi bi-check-circle-fill me-2"></i>{{ successMessage }}
-            <div class="mt-3">
-              <RouterLink to="/" class="btn btn-sm btn-success">Return to Portal</RouterLink>
-            </div>
+      <div v-if="successMessage">
+        <p class="muted">{{ successMessage }}</p>
+        <RouterLink to="/" class="btn btn-primary w-100">Return to Portal</RouterLink>
+      </div>
+
+      <div v-else>
+        <p v-if="errorMessage" class="muted mb-3" style="color: #ef4444 !important;">{{ errorMessage }}</p>
+
+        <form @submit.prevent="handleReset">
+          <div class="mb-3">
+            <label class="form-label">Email</label>
+            <input v-model="email" type="email" class="form-control" readonly disabled />
           </div>
 
-          <div v-else>
-            <div v-if="errorMessage" class="alert alert-danger py-2 small">{{ errorMessage }}</div>
-
-            <form @submit.prevent="handleReset">
-              <div class="mb-3">
-                <label class="form-label small text-secondary">Email Address</label>
-                <input v-model="email" type="email" class="form-control bg-dark text-light border-secondary" readonly disabled />
-              </div>
-
-              <div class="mb-3">
-                <label class="form-label small text-secondary">New Password</label>
-                <input v-model="password" type="password" class="form-control bg-dark text-light border-secondary" placeholder="Min. 8 characters" minlength="8" required />
-              </div>
-
-              <div class="mb-4">
-                <label class="form-label small text-secondary">Confirm New Password</label>
-                <input v-model="passwordConfirmation" type="password" class="form-control bg-dark text-light border-secondary" placeholder="Re-enter password" minlength="8" required />
-              </div>
-
-              <button type="submit" class="btn btn-primary w-100" :disabled="isLoading || !token">
-                <span v-if="isLoading" class="spinner-border spinner-border-sm me-1"></span>
-                Update Password
-              </button>
-            </form>
+          <div class="mb-3">
+            <label class="form-label">New Password</label>
+            <input v-model="password" type="password" class="form-control" placeholder="Min. 8 characters" minlength="8" required />
           </div>
-        </div>
+
+          <div class="mb-4">
+            <label class="form-label">Confirm New Password</label>
+            <input v-model="passwordConfirmation" type="password" class="form-control" placeholder="Re-enter password" minlength="8" required />
+          </div>
+
+          <button type="submit" class="btn btn-primary w-100" :disabled="isLoading || !token">
+            <span v-if="isLoading">Updating...</span>
+            <span v-else>Update Password</span>
+          </button>
+        </form>
       </div>
     </div>
   </div>
 </template>
+
+<style scoped>
+.reset-wrapper {
+  display: flex;
+  justify-content: center;
+  padding-top: var(--sp-40);
+}
+
+.reset-card {
+  width: 100%;
+  max-width: 400px;
+  padding: var(--sp-24);
+}
+</style>
