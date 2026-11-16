@@ -14,6 +14,7 @@ const mode = ref('login'); // 'login', 'register', 'forgot'
 // Form fields
 const loginField = ref('');
 const password = ref('');
+const passwordConfirmation = ref('');
 const username = ref('');
 const email = ref('');
 const role = ref('player');
@@ -21,6 +22,13 @@ const role = ref('player');
 const errorMessage = ref('');
 const successMessage = ref('');
 const isLoading = ref(false);
+
+function switchMode(newMode) {
+  mode.value = newMode;
+  errorMessage.value = '';
+  successMessage.value = '';
+  passwordConfirmation.value = '';
+}
 
 async function handleSubmit() {
   errorMessage.value = '';
@@ -32,6 +40,11 @@ async function handleSubmit() {
       await authStore.login(loginField.value.trim(), password.value);
       emit('close');
     } else if (mode.value === 'register') {
+      if (password.value !== passwordConfirmation.value) {
+        errorMessage.value = 'Passwords do not match.';
+        isLoading.value = false;
+        return;
+      }
       await authStore.register(username.value.trim(), email.value.trim(), password.value, role.value);
       emit('close');
     } else if (mode.value === 'forgot') {
@@ -51,37 +64,46 @@ async function handleSubmit() {
 </script>
 
 <template>
-  <div v-if="isOpen" class="modal-backdrop fade show"></div>
-  <div v-if="isOpen" class="modal fade show d-block" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered">
-      <div class="modal-content">
-        <!-- Header Tabs -->
-        <div class="modal-header d-flex justify-content-between align-items-center">
-          <div class="tab-group">
+  <div v-if="isOpen" class="modal-backdrop fade show" @click="$emit('close')"></div>
+  <div v-if="isOpen" class="modal fade show d-block" tabindex="-1" @click.self="$emit('close')">
+    <div class="modal-dialog modal-dialog-centered auth-dialog">
+      <div class="modal-content auth-card">
+        <!-- Header with Segmented Tabs & Close -->
+        <div class="auth-header">
+          <div class="auth-tabs" v-if="mode !== 'forgot'">
             <button
-              class="tab-btn"
+              type="button"
+              class="auth-tab-btn"
               :class="{ active: mode === 'login' }"
-              @click="mode = 'login'; errorMessage = ''; successMessage = ''"
+              @click="switchMode('login')"
             >
               Sign In
             </button>
             <button
-              class="tab-btn"
+              type="button"
+              class="auth-tab-btn"
               :class="{ active: mode === 'register' }"
-              @click="mode = 'register'; errorMessage = ''; successMessage = ''"
+              @click="switchMode('register')"
             >
               Register
             </button>
           </div>
-          <button type="button" class="btn-close-minimal" @click="$emit('close')">&times;</button>
+          <h4 v-else class="mb-0 fs-5 fw-bold">Reset Password</h4>
+
+          <button type="button" class="btn-close-modal" @click="$emit('close')" aria-label="Close">
+            <i class="bi bi-x-lg"></i>
+          </button>
         </div>
 
-        <div class="modal-body">
-          <div v-if="errorMessage" class="muted mb-3" style="color: #ef4444 !important;">
-            {{ errorMessage }}
+        <div class="auth-body">
+          <!-- Alerts -->
+          <div v-if="errorMessage" class="auth-alert auth-alert-error">
+            <i class="bi bi-exclamation-circle"></i>
+            <span>{{ errorMessage }}</span>
           </div>
-          <div v-if="successMessage" class="muted mb-3 text-link">
-            {{ successMessage }}
+          <div v-if="successMessage" class="auth-alert auth-alert-success">
+            <i class="bi bi-check-circle"></i>
+            <span>{{ successMessage }}</span>
           </div>
 
           <form @submit.prevent="handleSubmit">
@@ -93,7 +115,7 @@ async function handleSubmit() {
                   v-model="username"
                   type="text"
                   class="form-control"
-                  placeholder="Username"
+                  placeholder="Choose a username"
                   required
                 />
               </div>
@@ -104,7 +126,7 @@ async function handleSubmit() {
                   v-model="email"
                   type="email"
                   class="form-control"
-                  placeholder="Email address"
+                  placeholder="you@example.com"
                   required
                 />
               </div>
@@ -114,19 +136,19 @@ async function handleSubmit() {
                 <div class="role-selector">
                   <button
                     type="button"
-                    class="btn flex-grow-1"
-                    :class="role === 'player' ? 'btn-primary' : 'btn-secondary'"
+                    class="role-btn"
+                    :class="{ active: role === 'player' }"
                     @click="role = 'player'"
                   >
-                    Player
+                    <i class="bi bi-controller"></i> Player
                   </button>
                   <button
                     type="button"
-                    class="btn flex-grow-1"
-                    :class="role === 'developer' ? 'btn-primary' : 'btn-secondary'"
+                    class="role-btn"
+                    :class="{ active: role === 'developer' }"
                     @click="role = 'developer'"
                   >
-                    Developer
+                    <i class="bi bi-code-slash"></i> Developer
                   </button>
                 </div>
               </div>
@@ -140,7 +162,7 @@ async function handleSubmit() {
                   v-model="loginField"
                   type="text"
                   class="form-control"
-                  placeholder="Username or email"
+                  placeholder="Enter your username or email"
                   required
                 />
               </div>
@@ -149,31 +171,45 @@ async function handleSubmit() {
             <!-- Password for Login & Register -->
             <template v-if="mode !== 'forgot'">
               <div class="mb-3">
-                <label class="form-label">Password</label>
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                  <label class="form-label mb-0">Password</label>
+                  <a
+                    v-if="mode === 'login'"
+                    href="#"
+                    class="forgot-link"
+                    @click.prevent="switchMode('forgot')"
+                  >
+                    Forgot password?
+                  </a>
+                </div>
                 <input
                   v-model="password"
                   type="password"
                   class="form-control"
-                  placeholder="Password"
+                  placeholder="Enter your password"
+                  required
+                />
+              </div>
+              <div v-if="mode === 'register'" class="mb-3">
+                <label class="form-label">Confirm Password</label>
+                <input
+                  v-model="passwordConfirmation"
+                  type="password"
+                  class="form-control"
+                  placeholder="Confirm your password"
                   required
                 />
               </div>
 
-              <div v-if="mode === 'login'" class="mb-3">
-                <a href="#" class="text-link" @click.prevent="mode = 'forgot'; errorMessage = ''; successMessage = ''">
-                  Forgot password?
-                </a>
-              </div>
-
-              <button type="submit" class="btn btn-primary w-100" :disabled="isLoading">
-                <span v-if="isLoading">Loading...</span>
-                <span v-else>{{ mode === 'login' ? 'Sign In' : 'Register' }}</span>
+              <button type="submit" class="btn btn-primary w-100 mt-2 py-2" :disabled="isLoading">
+                <span v-if="isLoading">Please wait...</span>
+                <span v-else>{{ mode === 'login' ? 'Sign In' : 'Create Account' }}</span>
               </button>
             </template>
 
             <!-- Forgot Password View -->
             <template v-if="mode === 'forgot'">
-              <p class="muted mb-3">
+              <p class="text-muted small mb-3">
                 Enter your registered email to receive a password reset link.
               </p>
 
@@ -188,14 +224,14 @@ async function handleSubmit() {
                 />
               </div>
 
-              <button type="submit" class="btn btn-primary w-100 mb-2" :disabled="isLoading">
+              <button type="submit" class="btn btn-primary w-100 mb-3 py-2" :disabled="isLoading">
                 <span v-if="isLoading">Sending...</span>
                 <span v-else>Send Reset Link</span>
               </button>
 
               <div class="text-center">
-                <a href="#" class="muted" @click.prevent="mode = 'login'; errorMessage = ''; successMessage = ''">
-                  Back to Sign In
+                <a href="#" class="forgot-link" @click.prevent="switchMode('login')">
+                  <i class="bi bi-arrow-left"></i> Back to Sign In
                 </a>
               </div>
             </template>
@@ -207,47 +243,157 @@ async function handleSubmit() {
 </template>
 
 <style scoped>
-.tab-group {
+.auth-dialog {
+  max-width: 440px;
+}
+
+.auth-card {
+  background-color: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.55);
+  overflow: hidden;
+}
+
+.auth-header {
   display: flex;
-  gap: var(--sp-16);
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid var(--border);
 }
 
-.tab-btn {
-  background: none;
+/* Segmented Pill Tabs */
+.auth-tabs {
+  display: inline-flex;
+  background-color: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  padding: 4px;
+  gap: 6px;
+}
+
+.auth-tab-btn {
+  background: transparent;
   border: none;
-  font-family: inherit;
-  font-size: var(--fs-15);
-  font-weight: 400;
-  color: var(--muted);
-  cursor: pointer;
-  padding: 0;
-  transition: color 0.15s ease;
-}
-
-.tab-btn:hover {
-  color: var(--text);
-}
-
-.tab-btn.active {
-  color: var(--accent);
+  outline: none;
+  font-family: var(--font-sans);
+  font-size: 0.875rem;
   font-weight: 600;
-}
-
-.btn-close-minimal {
-  background: none;
-  border: none;
-  color: var(--muted);
-  font-size: 20px;
+  color: var(--text-muted);
+  padding: 0.45rem 1.15rem;
+  border-radius: var(--radius-pill);
   cursor: pointer;
-  line-height: 1;
+  transition: all 0.15s ease;
 }
 
-.btn-close-minimal:hover {
+.auth-tab-btn:hover:not(.active) {
   color: var(--text);
 }
 
-.role-selector {
+.auth-tab-btn.active {
+  background-color: var(--accent);
+  color: #ffffff;
+}
+
+.btn-close-modal {
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--text-muted);
+  font-size: 1rem;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-sm);
   display: flex;
-  gap: var(--sp-8);
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-close-modal:hover {
+  background-color: var(--surface-raised);
+  color: var(--text);
+}
+
+.auth-body {
+  padding: 1.5rem;
+}
+
+.form-label {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--text);
+  margin-bottom: 0.4rem;
+}
+
+.forgot-link {
+  font-size: 0.8rem;
+  color: var(--accent);
+  text-decoration: none;
+  transition: opacity 0.15s ease;
+}
+
+.forgot-link:hover {
+  opacity: 0.85;
+  text-decoration: underline;
+}
+
+/* Role Selector */
+.role-selector {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+.role-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.65rem 1rem;
+  background-color: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.role-btn:hover:not(.active) {
+  border-color: var(--text-muted);
+  color: var(--text);
+}
+
+.role-btn.active {
+  background-color: var(--accent-light);
+  border-color: var(--accent);
+  color: #38bdf8;
+}
+
+/* Alerts */
+.auth-alert {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.65rem 0.9rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.85rem;
+  margin-bottom: 1rem;
+}
+
+.auth-alert-error {
+  background-color: rgba(239, 68, 68, 0.12);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: #fca5a5;
+}
+
+.auth-alert-success {
+  background-color: rgba(34, 197, 94, 0.12);
+  border: 1px solid rgba(34, 197, 94, 0.3);
+  color: #86efac;
 }
 </style>

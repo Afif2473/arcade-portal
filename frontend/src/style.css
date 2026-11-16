@@ -261,11 +261,17 @@ p {
 /* ==========================================================================
    Cards & Inputs
    ========================================================================== */
-.card {
+.card,
+.modal-content {
   background-color: var(--surface);
   border: 1px solid var(--border);
-  border-radius: var(--radius);
+  border-radius: var(--radius-lg);
   color: var(--text);
+}
+
+.modal-backdrop.show {
+  opacity: 0.75;
+  background-color: #000000;
 }
 
 .form-control,
@@ -278,8 +284,25 @@ p {
   font-size: 0.9rem;
 }
 
+.form-control,
+.form-select {
+  background-color: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: var(--radius-sm);
+  padding: 0.65rem 0.9rem;
+  font-size: 0.9rem;
+}
+
+.form-control::placeholder {
+  color: var(--text-muted);
+  opacity: 0.7;
+}
+
 .form-control:focus,
 .form-select:focus {
+  background-color: var(--bg);
+  color: var(--text);
   border-color: var(--accent);
   outline: none;
   box-shadow: 0 0 0 2px var(--accent-light);
